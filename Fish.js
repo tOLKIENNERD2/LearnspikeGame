@@ -10,7 +10,7 @@ export default class Fish {
         this.acceleration = 0.5;
         this.deceleration = 0.9;
     }
-
+//testtesttest
     move(canvas) {
         // Apply deceleration
         this.dx *= this.deceleration;
