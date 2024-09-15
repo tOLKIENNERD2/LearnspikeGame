@@ -38,7 +38,7 @@ function setupCanvas() {
 function loadImages() {
     console.log("Loading images...");
     backgroundImage = new Image();
-    backgroundImage.src = 'seaweed1.png';
+    backgroundImage.src = 'Seaweed1.png';
     
     fishImage = new Image();
     fishImage.src = 'Fish1.png';
@@ -122,7 +122,7 @@ function gameLoop() {
     fish.draw(ctx, fishImage);
 
     if (sharkFish) {
-        sharkFish.move(fish.x, fish.y, canvas);
+        sharkFish.move(fish.x, fish.y, canvas, rock);  // Pass the rock object here
         if (rock.checkCollision(sharkFish)) {
             const normal = rock.getCollisionNormal(sharkFish);
             const pushDistance = sharkFish.radius + rock.collisionRadius - Math.sqrt((sharkFish.x - rock.x - rock.width/2)**2 + (sharkFish.y - rock.y - rock.height/2)**2);
