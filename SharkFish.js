@@ -1,100 +1,105 @@
 export default class SharkFish {
     constructor(canvas, fishSpeed) {
         this.canvas = canvas;
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
+        this.x = canvas.width / 2;
+        this.y = canvas.height / 2;
         this.radius = 30;
-        this.speed = fishSpeed * 1.2; // Increased speed to chase more aggressively
-        this.dx = 0;
-        this.dy = 0;
-        this.chaseTime = 0;
-        this.restTime = 0;
-        this.avoidanceRadius = 100; // Radius to start avoiding obstacles
+        this.baseSpeed = fishSpeed * 1.5;
+        this.speed = this.baseSpeed;
+        this.angle = Math.random() * Math.PI * 2;
+        this.turnSpeed = 0.03;
+        this.state = 'patrol';
+        this.patrolTimer = 0;
+        this.patrolDuration = 300;
+        this.chaseTimer = 0;
+        this.chaseDuration = 180;
+        this.restTimer = 0;
+        this.restDuration = 60;
     }
 
-    move(targetX, targetY, canvas, rock) {
-        const dx = targetX - this.x;
-        const dy = targetY - this.y;
-        let distance = Math.sqrt(dx * dx + dy * dy);
+    move(targetX, targetY) {
+        switch (this.state) {
+            case 'patrol':
+                this.patrol();
+                break;
+            case 'chase':
+                this.chase(targetX, targetY);
+                break;
+            case 'rest':
+                this.rest();
+                break;
+        }
 
-        // Avoid getting too close to canvas edges
-        const edgeAvoidance = this.avoidEdges(canvas);
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+
+        this.keepInBounds();
+    }
+
+    patrol() {
+        this.speed = this.baseSpeed * 0.7;
+        this.angle += (Math.random() - 0.5) * this.turnSpeed;
+        this.patrolTimer++;
+
+        if (this.patrolTimer >= this.patrolDuration) {
+            this.state = 'chase';
+            this.patrolTimer = 0;
+        }
+    }
+
+    chase(targetX, targetY) {
+        this.speed = this.baseSpeed * 1.2;
+        const targetAngle = Math.atan2(targetY - this.y, targetX - this.x);
+        const angleDiff = targetAngle - this.angle;
         
-        // Avoid the rock
-        const rockAvoidance = this.avoidRock(rock);
+        this.angle += Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), this.turnSpeed * 2);
+        this.chaseTimer++;
 
-        if (this.chaseTime > 0) {
-            // Chase mode
-            this.chaseTime--;
-            if (distance > 0) {
-                this.dx = (dx / distance) * this.speed;
-                this.dy = (dy / distance) * this.speed;
-            }
-        } else if (this.restTime > 0) {
-            // Rest mode
-            this.restTime--;
-            this.dx *= 0.95;
-            this.dy *= 0.95;
-        } else {
-            // Switch between chase and rest
-            if (Math.random() < 0.7) {
-                this.chaseTime = 120; // Chase for 2 seconds (assuming 60 FPS)
-            } else {
-                this.restTime = 60; // Rest for 1 second
-            }
+        if (this.chaseTimer >= this.chaseDuration) {
+            this.state = 'rest';
+            this.chaseTimer = 0;
         }
-
-        // Apply avoidance behaviors
-        this.dx += edgeAvoidance.x + rockAvoidance.x;
-        this.dy += edgeAvoidance.y + rockAvoidance.y;
-
-        // Normalize speed
-        const currentSpeed = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
-        if (currentSpeed > this.speed) {
-            this.dx = (this.dx / currentSpeed) * this.speed;
-            this.dy = (this.dy / currentSpeed) * this.speed;
-        }
-
-        this.x += this.dx;
-        this.y += this.dy;
-
-        // Keep sharkFish within canvas bounds
-        this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
-        this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
     }
 
-    avoidEdges(canvas) {
-        let avoidX = 0;
-        let avoidY = 0;
-        
-        if (this.x < this.avoidanceRadius) avoidX = this.avoidanceRadius - this.x;
-        if (this.x > canvas.width - this.avoidanceRadius) avoidX = canvas.width - this.avoidanceRadius - this.x;
-        if (this.y < this.avoidanceRadius) avoidY = this.avoidanceRadius - this.y;
-        if (this.y > canvas.height - this.avoidanceRadius) avoidY = canvas.height - this.avoidanceRadius - this.y;
+    rest() {
+        this.speed = 0;
+        this.restTimer++;
 
-        return { x: avoidX, y: avoidY };
+        if (this.restTimer >= this.restDuration) {
+            this.state = 'patrol';
+            this.restTimer = 0;
+        }
     }
 
-    avoidRock(rock) {
-        const dx = this.x - (rock.x + rock.width / 2);
-        const dy = this.y - (rock.y + rock.height / 2);
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < this.avoidanceRadius + rock.collisionRadius) {
-            return {
-                x: (dx / distance) * (this.avoidanceRadius + rock.collisionRadius - distance),
-                y: (dy / distance) * (this.avoidanceRadius + rock.collisionRadius - distance)
-            };
+    keepInBounds() {
+        const padding = this.radius;
+        if (this.x < padding || this.x > this.canvas.width - padding) {
+            this.angle = Math.PI - this.angle;
+        }
+        if (this.y < padding || this.y > this.canvas.height - padding) {
+            this.angle = -this.angle;
         }
 
-        return { x: 0, y: 0 };
+        this.x = Math.max(padding, Math.min(this.canvas.width - padding, this.x));
+        this.y = Math.max(padding, Math.min(this.canvas.height - padding, this.y));
     }
 
     draw(ctx, sharkFishImage) {
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(Math.atan2(this.dy, this.dx));
-        ctx.drawImage(sharkFishImage, -this.radius, -this.radius, this.radius * 2, this.radius * 2);
+        ctx.rotate(this.angle + Math.PI / 2);
+
+        // Adjust these values to fit your image
+        const drawWidth = this.radius * 4;  // Increase the width
+        const drawHeight = this.radius * 4; // Increase the height
+        ctx.drawImage(sharkFishImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+        
+        // Draw state indicator
+        ctx.fillStyle = this.state === 'patrol' ? 'yellow' : this.state === 'chase' ? 'red' : 'green';
+        ctx.beginPath();
+        ctx.arc(0, -drawHeight / 2 - 5, 5, 0, Math.PI * 2);
+        ctx.fill();
+        
         ctx.restore();
     }
 
