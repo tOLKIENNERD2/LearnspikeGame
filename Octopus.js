@@ -13,6 +13,15 @@ export default class Octopus {
         this.edgeAvoidDistance = 50; // Distance from edge to start avoiding
         this.stuckCounter = 0;
         this.maxStuckTime = 60; // 1 second at 60 FPS
+
+        // Add new properties for tentacles
+        this.tentacles = [];
+        this.numTentacles = 8;
+        this.tentacleLength = this.radius * 1.5;
+        this.initTentacles();
+
+        // Add a random shade of blue
+        this.color = this.getRandomBlueShade();
     }
 
     move(fish) {  // Remove rock parameter
@@ -93,56 +102,89 @@ export default class Octopus {
         return { x: forceX, y: forceY };
     }
 
+    initTentacles() {
+        for (let i = 0; i < this.numTentacles; i++) {
+            this.tentacles.push({
+                angle: (i / this.numTentacles) * Math.PI * 2,
+                segments: []
+            });
+            for (let j = 0; j < 5; j++) {
+                this.tentacles[i].segments.push({
+                    x: 0,
+                    y: 0
+                });
+            }
+        }
+    }
+
     draw(ctx) {
-        // Save the current context state
-        ctx.save();
-
-        // Translate to the octopus's position
-        ctx.translate(this.x, this.y);
-
-        // Rotate based on movement direction
-        ctx.rotate(Math.atan2(this.dy, this.dx));
-
-        // Draw the body
-        ctx.beginPath();
-        ctx.ellipse(0, 0, this.radius * 1.5, this.radius, 0, 0, Math.PI * 2);
-        ctx.fillStyle = 'purple';
-        ctx.fill();
-
-        // Draw the eyes
-        ctx.fillStyle = 'white';
-        ctx.beginPath();
-        ctx.arc(this.radius * 0.7, -this.radius * 0.3, this.radius * 0.2, 0, Math.PI * 2);
-        ctx.arc(this.radius * 0.7, this.radius * 0.3, this.radius * 0.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = 'black';
-        ctx.beginPath();
-        ctx.arc(this.radius * 0.8, -this.radius * 0.3, this.radius * 0.1, 0, Math.PI * 2);
-        ctx.arc(this.radius * 0.8, this.radius * 0.3, this.radius * 0.1, 0, Math.PI * 2);
-        ctx.fill();
-
         // Draw tentacles
-        ctx.strokeStyle = 'purple';
-        ctx.lineWidth = this.radius * 0.3;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = this.radius / 6;
         ctx.lineCap = 'round';
 
-        for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * Math.PI - Math.PI / 2;
-            const length = this.radius * (1.5 + Math.sin(Date.now() / 200 + i) * 0.3);
-
+        this.tentacles.forEach(tentacle => {
             ctx.beginPath();
-            ctx.moveTo(-this.radius * 0.5, 0);
-            ctx.quadraticCurveTo(
-                -this.radius * 2 * Math.cos(angle),
-                length * Math.sin(angle),
-                -this.radius * 2.5 * Math.cos(angle),
-                length * 1.2 * Math.sin(angle)
-            );
-            ctx.stroke();
-        }
+            let startX = this.x + Math.cos(tentacle.angle) * this.radius * 0.8;
+            let startY = this.y + Math.sin(tentacle.angle) * this.radius * 0.8;
+            ctx.moveTo(startX, startY);
 
-        // Restore the context state
-        ctx.restore();
+            let prevX = startX;
+            let prevY = startY;
+
+            tentacle.segments.forEach((segment, index) => {
+                const length = (this.tentacleLength / tentacle.segments.length) * (1 - index / tentacle.segments.length * 0.5);
+                const waveOffset = Math.sin(Date.now() / 500 + index * 0.5) * 15;
+                const perpX = Math.cos(tentacle.angle + Math.PI/2);
+                const perpY = Math.sin(tentacle.angle + Math.PI/2);
+                
+                segment.x = prevX + Math.cos(tentacle.angle) * length + perpX * waveOffset;
+                segment.y = prevY + Math.sin(tentacle.angle) * length + perpY * waveOffset;
+                
+                ctx.quadraticCurveTo(
+                    prevX + Math.cos(tentacle.angle) * length / 2 + perpX * waveOffset * 1.5,
+                    prevY + Math.sin(tentacle.angle) * length / 2 + perpY * waveOffset * 1.5,
+                    segment.x,
+                    segment.y
+                );
+
+                prevX = segment.x;
+                prevY = segment.y;
+            });
+
+            ctx.stroke();
+        });
+
+        // Draw body
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, this.radius, this.radius * 1.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw mantle
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y - this.radius * 0.3, this.radius * 0.8, this.radius * 0.6, 0, Math.PI, Math.PI * 2);
+        ctx.fill();
+
+        // Draw eyes
+        const eyeRadius = this.radius / 6;
+        const eyeOffset = this.radius / 3;
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x - eyeOffset, this.y - eyeOffset, eyeRadius, 0, Math.PI * 2);
+        ctx.arc(this.x + eyeOffset, this.y - eyeOffset, eyeRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - eyeOffset, this.y - eyeOffset, eyeRadius / 2, 0, Math.PI * 2);
+        ctx.arc(this.x + eyeOffset, this.y - eyeOffset, eyeRadius / 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    getRandomBlueShade() {
+        const r = Math.floor(Math.random() * 50);   // 0-50 for red
+        const g = Math.floor(Math.random() * 100);  // 0-100 for green
+        const b = Math.floor(Math.random() * 155) + 100;  // 100-255 for blue
+        return `rgb(${r}, ${g}, ${b})`;
     }
 }

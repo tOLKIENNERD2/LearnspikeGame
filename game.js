@@ -14,6 +14,15 @@ let keys = {};
 // Add a debug flag
 const DEBUG = true;
 
+// Add these new variables
+let level2BackgroundImage;
+let otherFishImage;
+let otherFish = [];
+const OCTOPI_TO_LEVEL_2 = 10; // Changed from 2 to 10
+
+let obstacleImage;
+let obstacle;
+
 function debug(...args) {
     if (DEBUG) {
         console.log(...args);
@@ -47,19 +56,31 @@ function loadImages() {
     backgroundImage = new Image();
     backgroundImage.src = 'Seaweed1.png';
     
+    level2BackgroundImage = new Image();
+    level2BackgroundImage.src = 'Level2.png';
+    
     fishImage = new Image();
     fishImage.src = 'Fish1.png';
+    
+    otherFishImage = new Image();
+    otherFishImage.src = 'Fish2.png'; // Use a different fish image for level 2
     
     sharkFishImage = new Image();
     sharkFishImage.src = 'Monsterfish.png';
     
+    obstacleImage = new Image();
+    obstacleImage.src = 'Obstacle.png'; // Add an image for the obstacle
+    
     const images = [
         { img: backgroundImage, name: 'background' },
+        { img: level2BackgroundImage, name: 'level2Background' },
         { img: fishImage, name: 'fish' },
-        { img: sharkFishImage, name: 'sharkFish' }
+        { img: otherFishImage, name: 'otherFish' },
+        { img: sharkFishImage, name: 'sharkFish' },
+        { img: obstacleImage, name: 'obstacle' }
     ];
 
-    Promise.all(images.map(({ img, name }) => 
+    return Promise.all(images.map(({ img, name }) => 
         new Promise((resolve, reject) => {
             img.onload = () => {
                 console.log(`${name} image loaded successfully`);
@@ -81,12 +102,67 @@ function loadImages() {
 }
 
 function drawBackground() {
-    if (backgroundImage) {
+    if (level === 1 && backgroundImage) {
         ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+    } else if (level === 2 && level2BackgroundImage) {
+        ctx.drawImage(level2BackgroundImage, 0, 0, canvas.width, canvas.height);
     } else {
         ctx.fillStyle = 'lightblue';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
+}
+
+function createObstacle() {
+    return {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        width: 100,
+        height: 100,
+        draw: function(ctx) {
+            if (obstacleImage) {
+                ctx.drawImage(obstacleImage, this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+            } else {
+                ctx.fillStyle = 'gray';
+                ctx.fillRect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+            }
+        },
+        checkCollision: function(fish) {
+            return fish.x + fish.radius > this.x - this.width/2 &&
+                   fish.x - fish.radius < this.x + this.width/2 &&
+                   fish.y + fish.radius > this.y - this.height/2 &&
+                   fish.y - fish.radius < this.y + this.height/2;
+        }
+    };
+}
+
+function createOtherFish() {
+    return {
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        radius: 25,
+        speed: 1.5 + Math.random() * 0.5,
+        dx: (Math.random() - 0.5) * 2,
+        dy: (Math.random() - 0.5) * 2,
+        draw: function(ctx) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(Math.atan2(this.dy, this.dx));
+            ctx.drawImage(otherFishImage, -this.radius, -this.radius, this.radius * 2, this.radius * 2);
+            ctx.restore();
+        },
+        move: function() {
+            this.x += this.dx * this.speed;
+            this.y += this.dy * this.speed;
+            if (this.x < 0 || this.x > canvas.width) this.dx *= -1;
+            if (this.y < 0 || this.y > canvas.height) this.dy *= -1;
+            
+            // Avoid the obstacle
+            if (obstacle.checkCollision(this)) {
+                this.dx *= -1;
+                this.dy *= -1;
+            }
+        }
+    };
 }
 
 function initGame() {
@@ -99,6 +175,7 @@ function initGame() {
     fish = new Fish(canvas.width / 4, canvas.height / 2);
     octopuses = [new Octopus(canvas), new Octopus(canvas), new Octopus(canvas)];
     sharkFish = null;
+    obstacle = createObstacle();
     console.log("Game initialized - Canvas size:", canvas.width, "x", canvas.height);
     gameLoop();
 }
@@ -110,8 +187,17 @@ function resetGame() {
     fish = new Fish(canvas.width / 4, canvas.height / 2);
     octopuses = [new Octopus(canvas), new Octopus(canvas), new Octopus(canvas)];
     sharkFish = null;
+    obstacle = createObstacle();
     debug("Game reset - Octopuses:", octopuses.length, "Score:", score);
     gameLoop();  // Add this line to restart the game loop
+}
+
+function goToLevelTwo() {
+    level = 2;
+    score = OCTOPI_TO_LEVEL_2;
+    otherFish = Array(5).fill().map(() => createOtherFish());
+    octopuses = []; // Remove all octopi
+    debug("Level 2 reached via hack!");
 }
 
 function gameLoop() {
@@ -124,13 +210,7 @@ function gameLoop() {
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        if (backgroundImage) {
-            drawBackground();
-        } else {
-            console.warn("Background image not loaded, using fallback");
-            ctx.fillStyle = 'lightblue';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
+        drawBackground();
         
         // Move fish based on pressed keys or touch controls
         if (keys.ArrowLeft || fish.touchLeft) fish.accelerate('left');
@@ -146,6 +226,60 @@ function gameLoop() {
             fish.drawFallback(ctx);
         }
 
+        if (level === 1) {
+            // Level 1 logic (octopi)
+            for (let i = octopuses.length - 1; i >= 0; i--) {
+                const octopus = octopuses[i];
+                octopus.move(fish);
+                octopus.draw(ctx);
+
+                if (fish.catchOctopus(octopus)) {
+                    score++;
+                    octopuses.splice(i, 1);
+                    debug("Octopus caught - New score:", score, "Octopuses left:", octopuses.length);
+                    
+                    if (score >= OCTOPI_TO_LEVEL_2) {
+                        goToLevelTwo();
+                    }
+                }
+            }
+
+            // Spawn new octopuses
+            const baseOctopusCount = 3;
+            const maxOctopuses = Math.min(8, baseOctopusCount + Math.floor(score / 5));
+            while (octopuses.length < maxOctopuses) {
+                octopuses.push(new Octopus(canvas));
+            }
+        } else if (level === 2) {
+            // Level 2 logic (other fish and obstacle)
+            obstacle.draw(ctx);
+            
+            for (let i = otherFish.length - 1; i >= 0; i--) {
+                const fish2 = otherFish[i];
+                fish2.move();
+                fish2.draw(ctx);
+
+                if (fish.catchOctopus(fish2)) { // Reuse catchOctopus method for simplicity
+                    score++;
+                    otherFish.splice(i, 1);
+                    debug("Other fish caught - New score:", score, "Other fish left:", otherFish.length);
+                }
+            }
+
+            // Spawn new other fish
+            const baseOtherFishCount = 5;
+            const maxOtherFish = Math.min(10, baseOtherFishCount + Math.floor((score - OCTOPI_TO_LEVEL_2) / 5));
+            while (otherFish.length < maxOtherFish) {
+                otherFish.push(createOtherFish());
+            }
+
+            // Check collision with obstacle
+            if (obstacle.checkCollision(fish)) {
+                fish.dx *= -1;
+                fish.dy *= -1;
+            }
+        }
+
         if (sharkFish) {
             sharkFish.move(fish.x, fish.y);
             if (sharkFishImage) {
@@ -156,67 +290,10 @@ function gameLoop() {
             }
             
             if (sharkFish.catchFish(fish)) {
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'white';
-                ctx.font = '48px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('Game Over!', canvas.width / 2, canvas.height / 2);
-                ctx.font = '24px Arial';
-                ctx.fillText('The SharkFish caught you!', canvas.width / 2, canvas.height / 2 + 40);
-                ctx.fillText('Click to restart', canvas.width / 2, canvas.height / 2 + 80);
-                
-                canvas.addEventListener('click', resetGame, { once: true });
+                gameOver();
                 return;
             }
         }
-
-        let octopusesCaught = 0;
-        let previousScore = score; // Add this line to track score changes
-
-        debug("Before octopus loop - Octopuses:", octopuses.length, "Score:", score);
-
-        if (!Array.isArray(octopuses) || octopuses.length === 0) {
-            console.error("Octopuses array is invalid. Reinitializing...");
-            octopuses = [new Octopus(canvas), new Octopus(canvas), new Octopus(canvas)];
-        }
-
-        for (let i = octopuses.length - 1; i >= 0; i--) {
-            const octopus = octopuses[i];
-            if (!octopus || typeof octopus.move !== 'function' || typeof octopus.draw !== 'function') {
-                console.error("Invalid octopus at index", i, "Removing...");
-                octopuses.splice(i, 1);
-                continue;
-            }
-            octopus.move(fish);
-            octopus.draw(ctx);
-
-            if (fish.catchOctopus(octopus)) {
-                score++;
-                octopusesCaught++;
-                octopuses.splice(i, 1);
-                debug("Octopus caught - New score:", score, "Octopuses left:", octopuses.length);
-            }
-        }
-
-        if (score !== previousScore) {
-            debug(`Score changed from ${previousScore} to ${score}`);
-        }
-
-        debug("After octopus loop - Octopuses:", octopuses.length, "Score:", score);
-
-        // Spawn new octopuses
-        const baseOctopusCount = 3;
-        const maxOctopuses = Math.min(8, baseOctopusCount + Math.floor(score / 5));
-        const newOctopusCount = Math.max(octopusesCaught, maxOctopuses - octopuses.length);
-        
-        debug("Spawning new octopuses:", newOctopusCount, "Max octopuses:", maxOctopuses);
-
-        for (let i = 0; i < newOctopusCount; i++) {
-            octopuses.push(new Octopus(canvas));
-        }
-
-        debug("After spawning - Octopuses:", octopuses.length, "Score:", score);
 
         // Ensure score is valid
         if (typeof score !== 'number' || isNaN(score)) {
@@ -242,20 +319,41 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+function gameOver() {
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'white';
+    ctx.font = '48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Game Over!', canvas.width / 2, canvas.height / 2);
+    ctx.font = '24px Arial';
+    ctx.fillText('The SharkFish caught you!', canvas.width / 2, canvas.height / 2 + 40);
+    ctx.fillText('Click to restart', canvas.width / 2, canvas.height / 2 + 80);
+    
+    canvas.addEventListener('click', resetGame, { once: true });
+}
+
 function displayScore() {
     ctx.fillStyle = 'white';
     ctx.font = '20px Arial';
     ctx.fillText(`Score: ${score}`, 10, 30);
-    ctx.fillText(`Octopuses: ${octopuses ? octopuses.length : 0}`, 10, 60);
-    if (!sharkFish) {
-        ctx.fillText(`SharkFish appears at 5 points`, 10, 90);
-    } else {
-        ctx.fillText(`Watch out for the SharkFish!`, 10, 90);
+    if (level === 1) {
+        ctx.fillText(`Octopuses: ${octopuses ? octopuses.length : 0}`, 10, 60);
+        ctx.fillText(`Catch ${OCTOPI_TO_LEVEL_2} octopi to reach Level 2`, 10, 90);
+    } else if (level === 2) {
+        ctx.fillText(`Other Fish: ${otherFish ? otherFish.length : 0}`, 10, 60);
+        ctx.fillText(`Level 2 - Catch fish and avoid the obstacle!`, 10, 90);
+    }
+    if (sharkFish) {
+        ctx.fillText(`Watch out for the SharkFish!`, 10, 120);
     }
 }
 
 document.addEventListener('keydown', (e) => {
     keys[e.code] = true;
+    if (e.code === 'KeyZ') {
+        goToLevelTwo();
+    }
 });
 
 document.addEventListener('keyup', (e) => {
