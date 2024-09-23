@@ -1,8 +1,11 @@
+import Fish from './Fish.js';
+import SimpleSharkFish from './SimpleSharkFish.js';
+
 export default class Rock {
     constructor(canvas) {
         this.canvas = canvas;
-        this.width = 200;  // Increased size
-        this.height = 160; // Increased size
+        this.width = 150;
+        this.height = 120;
         this.x = canvas.width / 2 - this.width / 2;
         this.y = canvas.height / 2 - this.height / 2;
         this.collisionPath = this.createCollisionPath();
@@ -20,14 +23,27 @@ export default class Rock {
         return path;
     }
 
-    draw(ctx, rockImage) {
-        ctx.drawImage(rockImage, this.x, this.y, this.width, this.height);
-        
-        // Visualize the collision area (for debugging)
+    draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.strokeStyle = 'red';
+        
+        // Draw the main rock shape
+        ctx.fillStyle = '#808080';
+        ctx.fill(this.collisionPath);
+        
+        // Add some shading and texture
+        ctx.strokeStyle = '#606060';
+        ctx.lineWidth = 2;
         ctx.stroke(this.collisionPath);
+        
+        // Add some highlights
+        ctx.beginPath();
+        ctx.moveTo(0.3 * this.width, 0.3 * this.height);
+        ctx.lineTo(0.6 * this.width, 0.25 * this.height);
+        ctx.strokeStyle = '#A0A0A0';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
         ctx.restore();
     }
 
@@ -51,5 +67,25 @@ export default class Rock {
             x: dx / distance,
             y: dy / distance
         };
+    }
+
+    initializeLevelElements(level, gameState) {
+        // Reset fish, monsterfish (SharkFish), and score for the new level
+        gameState.fish = [];
+        gameState.sharkFish = null;
+        gameState.score = 0;
+
+        // Add fish based on the level
+        const fishCount = 5 + (level * 2); // Increase fish count with each level
+        for (let i = 0; i < fishCount; i++) {
+            gameState.fish.push(new Fish(this.canvas));
+        }
+
+        // Add monsterfish (SharkFish) based on the level
+        if (level >= 2) {
+            gameState.sharkFish = new SimpleSharkFish(this.canvas);
+        }
+
+        console.log(`Level ${level} initialized with ${fishCount} fish and ${gameState.sharkFish ? 'a monsterfish' : 'no monsterfish'}`);
     }
 }

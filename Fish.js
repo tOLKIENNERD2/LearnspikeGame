@@ -16,6 +16,10 @@ export default class Fish {
     }
 //testtesttest
     move(canvas) {
+        if (!canvas) {
+            console.error("Canvas not provided to Fish.move method");
+            return;
+        }
         // Apply deceleration
         this.dx *= this.deceleration;
         this.dy *= this.deceleration;
@@ -92,5 +96,23 @@ export default class Fish {
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
+    }
+
+    handleEdgeCollisions(canvas) {
+        if (this.x - this.radius < 0) {
+            this.x = this.radius;
+            this.dx = Math.abs(this.dx);
+        } else if (this.x + this.radius > canvas.width) {
+            this.x = canvas.width - this.radius;
+            this.dx = -Math.abs(this.dx);
+        }
+
+        if (this.y - this.radius < 0) {
+            this.y = this.radius;
+            this.dy = Math.abs(this.dy);
+        } else if (this.y + this.radius > canvas.height) {
+            this.y = canvas.height - this.radius;
+            this.dy = -Math.abs(this.dy);
+        }
     }
 }
