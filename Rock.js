@@ -35,7 +35,8 @@ export default class Rock {
         ctx.strokeStyle = '#606060';
         ctx.lineWidth = 2;
         ctx.stroke(this.collisionPath);
-        
+        // Temporarily hide the rock
+        ctx.globalAlpha = 0;
         // Add some highlights
         ctx.beginPath();
         ctx.moveTo(0.3 * this.width, 0.3 * this.height);
